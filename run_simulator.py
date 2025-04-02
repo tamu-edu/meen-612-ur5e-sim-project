@@ -10,6 +10,7 @@ from pydrake.all import (
 )
 
 from my_controller import FeedbackController
+import numpy as np
 
 ur_path = "./ur_description/urdf/ur3e_cylinders_collision.urdf"
 
@@ -52,5 +53,5 @@ simulator = Simulator(diagram)
 
 meshcat.StartRecording()# these will add playback and video record buttons to meshcat
 simulator.set_target_realtime_rate(1)
-simulator.AdvanceTo(5) # final time to simulate to
+simulator.AdvanceTo(np.inf) # final time to simulate to
 meshcat.PublishRecording()

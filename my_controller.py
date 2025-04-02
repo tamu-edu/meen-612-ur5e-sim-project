@@ -1,5 +1,6 @@
 from pydrake.all import LeafSystem
 import copy
+import numpy as np
 
 class FeedbackController(LeafSystem):
     '''
@@ -39,9 +40,10 @@ class FeedbackController(LeafSystem):
         Vq =  self.plant_.CalcGravityGeneralizedForces(plant_context)  # calcs tau_g(q)
         Mq = self.plant_.CalcMassMatrix(plant_context) # calcs M(q)
        
+        time = context.get_time()
         '''Do your control work here'''
-        tau_control = -Vq # git the manipulator the torques to hold steady over gravity
-        
 
+        tau_control = np.ones_like(Vq)*np.sin(time)*0.1 - Vq  # git the manipulator the torques to hold steady over gravity
+        
         # send the computed torues to the robot
         output.SetFromVector(tau_control)
