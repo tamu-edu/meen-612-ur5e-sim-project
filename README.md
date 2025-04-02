@@ -26,3 +26,7 @@ you are now ready to run the examples in this repo!
 
 `python3 run_simulator.py`
 
+
+### Task Description
+
+Edit the `CalcControlEffort` function within the `FeedbackController` class in `my_controller.py` to implement your impedance controller
