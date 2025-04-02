@@ -32,7 +32,7 @@ plant.WeldFrames(plant.world_frame(), plant.GetFrameByName("ur_base_link"))
 plant.Finalize()
 
 # add our feedback controller block into the system diagram
-controller = builder.AddSystem(FeedbackController(plant, model_idx))
+controller = builder.AddSystem(FeedbackController())
 
 # connect the input and output ports
 builder.Connect(controller.GetOutputPort("tau_m"), plant.get_actuation_input_port())
