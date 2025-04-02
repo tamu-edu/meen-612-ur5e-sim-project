@@ -8,7 +8,7 @@ from pydrake.all import (
 import copy
 import numpy as np
 
-def local_load_in_or_multibody_plant():
+def local_load_in_multibody_plant():
     ur_path = "./ur_description/urdf/ur3e_cylinders_collision.urdf"
 
     # set up a diagram and meshcat viewer
@@ -38,7 +38,7 @@ class FeedbackController(LeafSystem):
         '''DO NO EDIT'''
         # drake specific setups
         LeafSystem.__init__(self)
-        self.plant_, self.model_idx_ = local_load_in_or_multibody_plant()
+        self.plant_, self.model_idx_ = local_load_in_multibody_plant()
         self.nstates = self.plant_.num_multibody_states(self.model_idx_)
         self.nq = self.plant_.num_positions(self.model_idx_)
         self.nv = self.plant_.num_velocities(self.model_idx_)
