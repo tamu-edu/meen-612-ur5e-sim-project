@@ -13,7 +13,8 @@ from my_controller import FeedbackController
 import numpy as np
 import matplotlib.pyplot as plt
 
-ur_path = "./ur_description/urdf/ur3e_cylinders_collision.urdf"
+ur_path = "./ur_description/urdf/ur5e.urdf"
+ur_pkg = "./ur_description/package.xml"
 
 # set up a diagram and meshcat viewer
 builder = DiagramBuilder()
@@ -25,10 +26,12 @@ plant, scene_graph = AddMultibodyPlant(
         time_step=2e-3 # indicates that the solver should use a 500Hz timestep
         ),builder=builder)
 parser = Parser(plant)
+parser.package_map().AddPackageXml(ur_pkg)
+
 model_idx = parser.AddModels(ur_path)[0]
 
 # weld the robot to the workspace or else it would just fall
-plant.WeldFrames(plant.world_frame(), plant.GetFrameByName("ur_base_link"))
+# plant.WeldFrames(plant.world_frame(), plant.GetFrameByName("base_link"))
 # finish editing the plant
 plant.Finalize()
 
