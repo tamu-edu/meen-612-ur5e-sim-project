@@ -8,9 +8,9 @@ from pydrake.all import (
 import copy
 import numpy as np
 
-def local_load_in_multibody_plant():
-    ur_path = "./ur_description/urdf/ur3e_cylinders_collision.urdf"
-
+def local_load_in_multibody_plant():   
+    ur_path = "./ur_description/urdf/ur5e.urdf"
+    ur_pkg = "./ur_description/package.xml"
     # set up a diagram and meshcat viewer
     local_builder = DiagramBuilder()
 
@@ -20,10 +20,10 @@ def local_load_in_multibody_plant():
             time_step=2e-3 # indicates that the solver should use a 500Hz timestep
             ),builder=local_builder)
     parser = Parser(local_plant)
+    parser.package_map().AddPackageXml(ur_pkg)
     local_model_idx = parser.AddModels(ur_path)[0]
-
     # weld the robot to the workspace or else it would just fall
-    local_plant.WeldFrames(local_plant.world_frame(), local_plant.GetFrameByName("ur_base_link"))
+    # local_plant.WeldFrames(local_plant.world_frame(), local_plant.GetFrameByName("base_link"))
     # finish editing the plant
     local_plant.Finalize()
 
