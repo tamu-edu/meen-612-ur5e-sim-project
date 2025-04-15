@@ -16,6 +16,8 @@ fig, ax = plt.subplots(3,1,sharex=True)
 #state_names = plant.GetStateNames() # print this out if you're curious, or use pythons '.index()' function to plot specifics
 #actuator_names = [plant.get_joint_actuator(i).name() for i in plant.GetJointActuatorIndices()]
 
+print(f"{state_data[0,:6]}")
+
 ax[0].plot(state_times, state_data[:,:6])#, label=state_names)
 ax[1].plot(state_times, state_data[:,6:])#, label=state_names)
 ax[2].plot(contr_times, contr_data)#, label=actuator_names)
