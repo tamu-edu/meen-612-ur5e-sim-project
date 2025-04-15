@@ -7,9 +7,9 @@ Code repository for the MEEN 408/612 class project involving UR5e robots simulat
 After cloning this repo, you should open the command line and navigate to this code's folder.
 
 Then run the following on the command line. This will create a virtual environment in the env/ folder. You may choose to call it something else, but you will need to update the `.gitignore`
-'''
+```
 python3 -m venv env
-'''
+```
 
 then source the environment to activate it (for linux machines)
 
