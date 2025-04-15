@@ -9,9 +9,13 @@ from pydrake.all import (
     LogVectorOutput
 )
 
-from my_controller import FeedbackController
+from drake_controller_wrapper import FeedbackControllerDrakeSimWrapper
 import numpy as np
 import matplotlib.pyplot as plt
+
+
+
+
 
 ur_path = "./ur_description/urdf/ur5e.urdf"
 ur_pkg = "./ur_description/package.xml"
@@ -36,7 +40,7 @@ model_idx = parser.AddModels(ur_path)[0]
 plant.Finalize()
 
 # add our feedback controller block into the system diagram
-controller = builder.AddSystem(FeedbackController())
+controller = builder.AddSystem(FeedbackControllerDrakeSimWrapper())
 
 # connect the input and output ports
 builder.Connect(controller.GetOutputPort("tau_m"), plant.get_actuation_input_port())
@@ -74,19 +78,9 @@ contr_data = contr_log.data().transpose()
 state_times = state_log.sample_times()
 contr_times = contr_log.sample_times()
 
-fig, ax = plt.subplots(1,2)
-state_names = plant.GetStateNames() # print this out if you're curious, or use pythons '.index()' function to plot specifics
-actuator_names = [plant.get_joint_actuator(i).name() for i in plant.GetJointActuatorIndices()]
+np.savetxt("state_data.csv", state_data, fmt='%.18e', delimiter=",")
+np.savetxt("contr_data.csv", contr_data, fmt='%.18e', delimiter=",")
+np.savetxt("state_times.csv", state_times, fmt='%.18e', delimiter=",")
+np.savetxt("contr_times.csv", contr_times, fmt='%.18e', delimiter=",")
 
-ax[0].plot(state_times, state_data, label=state_names)
-ax[1].plot(contr_times, contr_data, label=actuator_names)
-ax[0].legend()
-ax[0].grid()
-ax[0].set_xlabel('time (s)')
-ax[0].set_ylabel('positions or velocities')
-ax[1].legend()
-ax[1].grid()
-ax[1].set_xlabel('time (s)')
-ax[1].set_ylabel('commanded torques')
 
-plt.show()

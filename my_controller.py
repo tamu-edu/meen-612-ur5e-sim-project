@@ -1,5 +1,4 @@
 from pydrake.all import (
-    LeafSystem,
     DiagramBuilder,
     MultibodyPlantConfig,
     Parser,
@@ -28,36 +27,24 @@ def local_load_in_multibody_plant():
     local_plant.Finalize()
 
     return local_plant, local_model_idx
-
-
-class FeedbackController(LeafSystem):
-    '''
-        DESCRIPTION
-    '''
+    
+   
+   
+class FeedbackController():
     def __init__(self):
-        '''DO NO EDIT'''
-        # drake specific setups
-        LeafSystem.__init__(self)
+        # This is a model, which we keep around so we can ask it for the mass matrix and gravity
         self.plant_, self.model_idx_ = local_load_in_multibody_plant()
-        self.nstates = self.plant_.num_multibody_states(self.model_idx_)
-        self.nq = self.plant_.num_positions(self.model_idx_)
-        self.nv = self.plant_.num_velocities(self.model_idx_)
-
-        # declare avector input port the size of the robots state
-        self.DeclareVectorInputPort("robot_state", self.nstates)
-        
-        #declare an output port for the controller
-        self.DeclareVectorOutputPort("tau_m", self.plant_.num_actuated_dofs(self.model_idx_), self.CalcControlEffort)
-        
-        
-        
-    def CalcControlEffort(self, simulator_context, output):
-        # read in the states
-        sampled_states = self.GetInputPort("robot_state").Eval(simulator_context)
-        
+        #self.nstates = self.plant_.num_multibody_states(self.model_idx_)
+        #self.nq = self.plant_.num_positions(self.model_idx_)
+        #self.nv = self.plant_.num_velocities(self.model_idx_)
+        #print(f"{self.nstates=}, {self.nq=}, {self.nv=}")
+    
+    def calc_control_effort(self, q, qd, time_now):
         # update what we think the plant is at
         plant_context = self.plant_.CreateDefaultContext()
+        sampled_states = np.hstack((q, qd))
         self.plant_.SetPositionsAndVelocities(plant_context, sampled_states)
+        
         
         # build system matricies
         # recall these are defined like
@@ -65,14 +52,15 @@ class FeedbackController(LeafSystem):
         # see below for more info:
         # https://drake.mit.edu/doxygen_cxx/classdrake_1_1multibody_1_1_multibody_plant.html
         Cv = self.plant_.CalcBiasTerm(plant_context) # calcs C(q, v) v
-        Vq =  self.plant_.CalcGravityGeneralizedForces(plant_context)  # calcs tau_g(q)
+        Vq = self.plant_.CalcGravityGeneralizedForces(plant_context)  # calcs tau_g(q)
         Mq = self.plant_.CalcMassMatrix(plant_context) # calcs M(q)
        
-        simulator_time = simulator_context.get_time()
+        
         '''Do your control work here'''
 
         # a bad controller with oscillating torques about the gravity compensation
-        tau_control = np.ones_like(Vq)*np.sin(simulator_time)*0.01 - Vq  # git the manipulator the torques to hold steady over gravity
-        
-        # send the computed torues to the robot
-        output.SetFromVector(tau_control)
+        tau_control = np.ones_like(Vq)*np.sin(60*time_now)*0.01 - Vq  # git the manipulator the torques to hold steady over gravity
+        return tau_control
+
+
+
