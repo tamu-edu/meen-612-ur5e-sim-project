@@ -13,13 +13,17 @@ python3 -m venv env
 
 then source the environment to activate it (for linux machines)
 
-`source env/bin/activate`
+```
+source env/bin/activate
+```
 
 (env) will then appear at the start of the terminal line. This can also be set happen automatically when opening vscode by selecting the activated file as the default interpreter in the command pallet `ctrl+p`
 
 Finally, install drake
 
-`pip install drake`
+```
+pip install drake
+```
 
 you are now ready to run the examples in this repo!
 
@@ -27,7 +31,9 @@ you are now ready to run the examples in this repo!
 
 ### Running the Sim
 
-`python3 run_simulator.py`
+```
+python3 run_simulator.py
+```
 
 
 ### Task Description
