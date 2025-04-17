@@ -88,7 +88,52 @@ def test_controller():
         controller.plant_context, tool_frame, np.array([[0,0,0]]).T, world_frame, world_frame))
     J = controller.plant_.CalcJacobianPositionVector(
         controller.plant_context, tool_frame, np.array([[0,0,0]]).T, world_frame, world_frame)
-
+        
+def test_jacobian():  
+    controller = FeedbackController()
+    q_0 = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+    qd_0 = np.array([0.0,0.0,0.0,0.0,0.0,0.0])
+    controller.calc_control_effort(q_0, qd_0, 0.0)
+    
+    world_frame = controller.plant_.GetFrameByName("world")
+    tool_frame = controller.plant_.GetFrameByName("tool0")
+    J_hyp = controller.plant_.CalcJacobianPositionVector(
+        controller.plant_context, tool_frame, np.array([[0,0,0]]).T, world_frame, world_frame)
+    J_hyp_short = J_hyp[:,:3]
+    print(J_hyp_short)
+    print(f"{np.linalg.svd(J_hyp_short)=}")
+    
+    delta_x_desired = np.array([0.1,0,0])
+    delta_q_desired = np.zeros((6,))
+    delta_q_desired[:3] = np.linalg.solve(J_hyp_short, delta_x_desired)
+    # but how do we find the position of the end-effector in the world frame?
+    print(dir(controller.plant_))
+    print(controller.plant_)
+    print(type(controller.plant_))
+    print(delta_q_desired)
+    print(dir(tool_frame))
+    print(tool_frame.CalcPoseInWorld.__doc__)
+    print(dir(tool_frame.CalcPoseInWorld(controller.plant_context)))
+    x_0 = tool_frame.CalcPoseInWorld(controller.plant_context
+     ).translation()
+    print(tool_frame.CalcPoseInWorld(controller.plant_context
+     ).translation())
+     
+    q_1 = q_0 + delta_q_desired
+    
+    controller.calc_control_effort(q_1, qd_0, 0.0)
+    
+    x_1 = tool_frame.CalcPoseInWorld(controller.plant_context
+     ).translation()
+     
+    print(f"{x_1-x_0=}, {delta_x_desired=}")
+    
+    
+     
+     
+    
+    
 if __name__=="__main__":
-    test_controller()
+    #test_controller()
+    test_jacobian()
 
