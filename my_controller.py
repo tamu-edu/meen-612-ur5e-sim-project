@@ -56,19 +56,49 @@ class FeedbackController():
         Vq = self.plant_.CalcGravityGeneralizedForces(self.plant_context)  # calcs tau_g(q)
         Mq = self.plant_.CalcMassMatrix(self.plant_context) # calcs M(q)
         
-        q0 = np.array([0,0,0,0,0,0])
-        
-        
 
-        #des_q = 
-        #des_qd = 
-        #des_qdd = 
+
+        q0 = np.array([0,0,0,0,0,0])
+        q1 = np.array([0,0,0,0,0,0])
+        q2 = np.array([np.pi,0,0,0,0,0])
+        q3 = np.array([np.pi,0,0,0,0,0])
+
+        path = lambda s: (1-s)**3 * q0 + s*(1-s)**2*3*q1 + 3*s**2*(1-s)*q2 + s**3 * q3
+
+        path_prime = lambda s: (
+            3*(1-s)**2 * (-1) * q0 
+            + (1-s)**2*3*q1 + s*(1-s)*2*(-1)*3*q1
+            + 3*2*s*(1-s)*q2 + 3*s**2*(-1)*q2
+            + 3*s**2 * q3
+            )
+        path_dprime = lambda s: (
+            3*2*(1-s)**1 * (1)*q0
+            +3*2*(1-s)*(-1)*q1 + (1-s)*2*(-1)*3*q1 + s*(-1)*2*(-1)*3*q1
+            + 3*2*(1-s)*q2 + 3*2*s*(-1)*q2 + 3*2*s*(-1)*q2
+            + 3*2*s*q3)
+
+
+        # s = time_now/30
+        # dq_des/s = path_prime
+        # dq_des/time_now = dq_des/s*ds/dtime_now
+        q_des = path(time_now/30)
+        qd_des = path_prime(time_now/30)*1/30
+        qdd_des = path_dprime(time_now/30)*1/30*1/30
        
-        
         '''Do your control work here'''
 
+        K = np.array([
+            [10,0,0,0,0,0],
+            [0,10,0,0,0,0],
+            [0,0,10,0,0,0],
+            [0,0,0,10,0,0],
+            [0,0,0,0,1,0],
+            [0,0,0,0,0,0.1],
+            ])
+
+
         # a bad controller with oscillating torques about the gravity compensation
-        tau_control = np.ones_like(Vq)*np.sin(60*time_now)*0.01 - Vq  # git the manipulator the torques to hold steady over gravity
+        tau_control = Mq@qdd_des - K @ (q-q_des) - 1/10*K @ (qd-qd_des) - Vq  # git the manipulator the torques to hold steady over gravity
         return tau_control
 
 def test_controller():

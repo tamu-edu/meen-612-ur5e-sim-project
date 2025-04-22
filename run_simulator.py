@@ -65,7 +65,7 @@ simulator = Simulator(diagram)
 
 meshcat.StartRecording()# these will add playback and video record buttons to meshcat
 simulator.set_target_realtime_rate(1)
-simulator.AdvanceTo(100) # final time to simulate to
+simulator.AdvanceTo(30) # final time to simulate to
 meshcat.PublishRecording()
 
 # se up plots
