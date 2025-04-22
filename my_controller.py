@@ -58,6 +58,8 @@ class FeedbackController():
         
         q0 = np.array([0,0,0,0,0,0])
         
+        
+
         #des_q = 
         #des_qd = 
         #des_qdd = 
@@ -103,7 +105,8 @@ def test_jacobian():
     print(J_hyp_short)
     print(f"{np.linalg.svd(J_hyp_short)=}")
     
-    delta_x_desired = np.array([0.1,0,0])
+    scale = 1e-6
+    delta_x_desired = np.array([1, 0, 0])*scale
     delta_q_desired = np.zeros((6,))
     delta_q_desired[:3] = np.linalg.solve(J_hyp_short, delta_x_desired)
     # but how do we find the position of the end-effector in the world frame?
@@ -126,7 +129,7 @@ def test_jacobian():
     x_1 = tool_frame.CalcPoseInWorld(controller.plant_context
      ).translation()
      
-    print(f"{x_1-x_0=}, {delta_x_desired=}")
+    print(f"{(x_1-x_0)/scale=}, {delta_x_desired/scale=}")
     
     
      
