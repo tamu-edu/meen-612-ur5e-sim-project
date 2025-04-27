@@ -1,3 +1,7 @@
 env/
 __pycache__/
 *.csv
+build/
+*.so
+*.o
+meen612rtde/c++/build
