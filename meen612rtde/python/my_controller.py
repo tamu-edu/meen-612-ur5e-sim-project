@@ -41,8 +41,12 @@ class FeedbackController():
         self.q0 = np.array(q0)
         self.q1 = np.array(q1)
         self.plant_context = self.plant_.CreateDefaultContext()
+        self.time_bias = None
     
     def calc_control_effort(self, q, qd, time_now):
+        if self.time_bias is None:
+            self.time_bias = time_now
+        time_now -= self.time_bias
         # update what we think the plant is at
         self.plant_context = self.plant_.CreateDefaultContext()
         sampled_states = np.hstack((q, qd))
@@ -58,8 +62,10 @@ class FeedbackController():
         Vq = self.plant_.CalcGravityGeneralizedForces(self.plant_context)  # calcs tau_g(q)
         Mq = self.plant_.CalcMassMatrix(self.plant_context) # calcs M(q)
         
-        if time_now>30:
-            time_now = 30.
+        traj_t = 5.
+
+        if time_now>traj_t:
+            time_now = traj_t
 
         q0 = self.q0
         q1 = self.q0
@@ -84,9 +90,11 @@ class FeedbackController():
         # s = time_now/30
         # dq_des/s = path_prime
         # dq_des/time_now = dq_des/s*ds/dtime_now
-        q_des = path(time_now/30)
-        qd_des = path_prime(time_now/30)*1/30
-        qdd_des = path_dprime(time_now/30)*1/30*1/30
+        self.q_des = path(time_now/traj_t)
+        self.qd_des = path_prime(time_now/traj_t)*1/traj_t
+        self.qdd_des = path_dprime(time_now/traj_t)*1/traj_t*1/traj_t
+        if time_now==traj_t:
+            self.qdd_des *= 0.0
        
         '''Do your control work here'''
 
@@ -99,7 +107,7 @@ class FeedbackController():
             [0,0,0,0,0,0.1],
             ])
 
-        freq = 0.2 # Hz
+        freq = 0.8 # Hz
         zeta = 1. # critical damping
         omega_n = 2*np.pi*freq
         Kprime = np.eye(6)*(omega_n)**2
@@ -107,7 +115,7 @@ class FeedbackController():
 
 
         # a bad controller with oscillating torques about the gravity compensation
-        tau_control = Mq@qdd_des + Mq@(- Kprime @ (q-q_des) - Bprime @ (qd-qd_des)) - Vq + Cv 
+        tau_control = Mq@self.qdd_des + Mq@(- Kprime @ (q-self.q_des) - Bprime @ (qd-self.qd_des)) - Vq + Cv 
         return tau_control
 
 def test_controller():

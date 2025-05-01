@@ -7,20 +7,20 @@ from meen612_ID import InverseDynamics
 
 # from my_admittance import 
 
-jois = [4,]#range(6)#2 # joint of interest
+jois = range(6)#2 # joint of interest
 filename = 'robot_data.csv'
 # filename = "good_data/joint4_first_chirp_with_pushes.csv"
-filename = "good_data/j4_sysid2.csv"  
+# filename = "good_data/j4_sysid2.csv"  
 # filename = "good_data/j4_sys_ID_no_envelope.csv"
 # filename = "good_data/whole_robot_1.csv"
 
 # Literature values from
-    # Andrea Raviola *, Roberto Guida, Andrea De Martin, Stefano Pastorelli, Stefano Mauro and Massimo Sorli
-    # "Effects of Temperature and Mounting Configuration on the Dynamic Parameters Identification of Industrial Robots"
-    # Robotics 2021, 10, 83. https://doi.org/10.3390/robotics10030083 (MDPI)
-    # See Table 1 on page 4
-    literature_G = 101.0
-    literature_Ktau = np.array([0.1350, 0.1361, 0.1355, 0.0957, 0.0865, 0.0893])*literature_G
+# Andrea Raviola *, Roberto Guida, Andrea De Martin, Stefano Pastorelli, Stefano Mauro and Massimo Sorli
+# "Effects of Temperature and Mounting Configuration on the Dynamic Parameters Identification of Industrial Robots"
+# Robotics 2021, 10, 83. https://doi.org/10.3390/robotics10030083 (MDPI)
+# See Table 1 on page 4
+literature_G = 101.0
+literature_Ktau = np.array([0.1350, 0.1361, 0.1355, 0.0957, 0.0865, 0.0893])*literature_G
 
 (timestamp, actual_q_0, actual_q_1, actual_q_2, actual_q_3, actual_q_4, actual_q_5,
     actual_qd_0, actual_qd_1, actual_qd_2, actual_qd_3, actual_qd_4, actual_qd_5,
@@ -31,7 +31,9 @@ filename = "good_data/j4_sysid2.csv"
     target_moment_0, target_moment_1, target_moment_2, target_moment_3, target_moment_4, target_moment_5,
     target_q_0, target_q_1, target_q_2, target_q_3, target_q_4, target_q_5,
     target_qd_0, target_qd_1, target_qd_2, target_qd_3, target_qd_4, target_qd_5,
-    target_qdd_0, target_qdd_1, target_qdd_2, target_qdd_3, target_qdd_4, target_qdd_5
+    target_qdd_0, target_qdd_1, target_qdd_2, target_qdd_3, target_qdd_4, target_qdd_5,
+    ctrl_u_0, ctrl_u_1, ctrl_u_2, ctrl_u_3, ctrl_u_4, ctrl_u_5,
+    sim_q_0, sim_q_1, sim_q_2, sim_q_3, sim_q_4, sim_q_5
     )=np.loadtxt(filename, delimiter=',', skiprows=1).T
 target_q = np.vstack([target_q_0, target_q_1, target_q_2, target_q_3, target_q_4, target_q_5]).T
 target_qd = np.vstack([target_qd_0, target_qd_1, target_qd_2, target_qd_3, target_qd_4, target_qd_5]).T
@@ -51,7 +53,8 @@ actual_joint_voltage = np.vstack([actual_joint_voltage_0, actual_joint_voltage_1
 software_target_q = np.vstack([software_target_q_0, software_target_q_1, software_target_q_2, software_target_q_3, software_target_q_4, software_target_q_5]).T
 target_current = np.vstack([target_current_0, target_current_1, target_current_2, target_current_3, target_current_4, target_current_5]).T
 target_moment = np.vstack([target_moment_0, target_moment_1, target_moment_2, target_moment_3, target_moment_4, target_moment_5]).T
-
+ctrl_u = np.vstack([ctrl_u_0, ctrl_u_1, ctrl_u_2, ctrl_u_3, ctrl_u_4, ctrl_u_5]).T
+sim_q = np.vstack([sim_q_0, sim_q_1, sim_q_2, sim_q_3, sim_q_4, sim_q_5]).T
 print(f"{actual_q[0,:]=}")
 print(f"{actual_q[-1,:]=}")
 
@@ -92,6 +95,9 @@ for joi in jois:
     #        [-9.96845232e+01],
     #        [-3.11808602e+00]])
 
+
+
+
     b_01 = np.array(target_qd[:,joi]).reshape((-1,1))
     A_01 = np.hstack([
         np.roll(target_qdd[:,[joi]],1,axis=0), 
@@ -125,34 +131,34 @@ for joi in jois:
 
     ## Parameter identification for target_current
 
+    if False:
 
-
-    b_1 = np.array(target_current[:,joi]).reshape((-1,1))
-    max_current = np.max(target_current[:,joi])
-    min_current = np.min(target_current[:,joi])
-    thresh = 0.95
-    w_1 = (1 - (target_current[:,joi]>thresh*max_current) - (target_current[:,joi]<thresh*min_current)).reshape((-1,1))
-    A_1 = np.hstack([#np.ones(b_1.shape), 
-        # np.roll(actual_q[:,[joi]],1,axis=0),  
-        # np.roll(actual_qd[:,[joi]],1,axis=0), 
-        # np.roll(target_q[:,[joi]],0,axis=0),  
-        np.roll(np.clip(target_qd[:,[joi]],-0.01, 0.01),0,axis=0), 
-        # np.roll(target_qdd[:,[joi]],0,axis=0)
-        np.roll(target_moment[:,[joi]],0,axis=0)
-        # actual_qd[:,[joi]]/(np.abs(actual_qd[:,[joi]])+1e-4), 
-        # # (e/(np.abs(e)+1e-1)).reshape((-1,1)), 
-        # (e/(np.abs(e)+1e-3)).reshape((-1,1)),
-        # (software_target_q[:,[joi]]-actual_q[:,[joi]]), 
-        # # (software_target_q[:,[joi]]-actual_q[:,[joi]])/(np.abs((software_target_q[:,[joi]]-actual_q[:,[joi]]))+1e-4),
-        # # int_e.reshape((-1,1))
-        ])
-    x_1 = np.linalg.solve(A_1.T@(w_1*A_1), A_1.T@(w_1*b_1))
-    resid_1 = w_1*(b_1-A_1@x_1)
-    RMSE_1 = float(np.sqrt(resid_1.T@resid_1/(np.sum(w_1)))[0,0])
-    print(f"{x_1=}")
-    print(f"{RMSE_1=} amps") 
-    print(f"{min_current=} {max_current=}")
-    Ktau = float(1/x_1[1,0])
+        b_1 = np.array(target_current[:,joi]).reshape((-1,1))
+        max_current = np.max(target_current[:,joi])
+        min_current = np.min(target_current[:,joi])
+        thresh = 0.95
+        w_1 = (1 - (target_current[:,joi]>thresh*max_current) - (target_current[:,joi]<thresh*min_current)).reshape((-1,1))
+        A_1 = np.hstack([#np.ones(b_1.shape), 
+            # np.roll(actual_q[:,[joi]],1,axis=0),  
+            # np.roll(actual_qd[:,[joi]],1,axis=0), 
+            # np.roll(target_q[:,[joi]],0,axis=0),  
+            np.roll(np.clip(target_qd[:,[joi]],-0.01, 0.01),0,axis=0), 
+            # np.roll(target_qdd[:,[joi]],0,axis=0)
+            np.roll(target_moment[:,[joi]],0,axis=0)
+            # actual_qd[:,[joi]]/(np.abs(actual_qd[:,[joi]])+1e-4), 
+            # # (e/(np.abs(e)+1e-1)).reshape((-1,1)), 
+            # (e/(np.abs(e)+1e-3)).reshape((-1,1)),
+            # (software_target_q[:,[joi]]-actual_q[:,[joi]]), 
+            # # (software_target_q[:,[joi]]-actual_q[:,[joi]])/(np.abs((software_target_q[:,[joi]]-actual_q[:,[joi]]))+1e-4),
+            # # int_e.reshape((-1,1))
+            ])
+        x_1 = np.linalg.solve(A_1.T@(w_1*A_1), A_1.T@(w_1*b_1))
+        resid_1 = w_1*(b_1-A_1@x_1)
+        RMSE_1 = float(np.sqrt(resid_1.T@resid_1/(np.sum(w_1)))[0,0])
+        print(f"{x_1=}")
+        print(f"{RMSE_1=} amps") 
+        print(f"{min_current=} {max_current=}")
+        Ktau = float(1/x_1[1,0])
 
     
 
@@ -160,7 +166,7 @@ for joi in jois:
     # x_1=array([[22.71198699],
     #        [ 0.11852733]])
     # RMSE_1=0.0009797746394819675 amps
-    print(f"{Ktau=} vs {literature_Ktau[joi]=}")
+    # print(f"{Ktau=} vs {literature_Ktau[joi]=}")
 
     ## Recreation of internal states
     j = actual_q[:,joi] # likely the output encoder
@@ -190,7 +196,7 @@ for joi in jois:
     RMSE_11 = float(np.sqrt(resid_11.T@resid_11/(len(b_11)))[0,0])
     print(f"{x_11=}")
     print(f"{RMSE_11=} amps") 
-    print(f"{min_current=} {max_current=}")
+    # print(f"{min_current=} {max_current=}")
 
 
     # print(timestamp)
@@ -202,7 +208,9 @@ for joi in jois:
         axs[0].plot(timestamp-timestamp[0], actual_q[:,joi], label="actual_q")
         axs[0].plot(timestamp-timestamp[0], software_target_q[:,joi], label="software_target_q")
         axs[0].plot(timestamp-timestamp[0], target_q[:,joi], label="target_q")
-        axs[0].plot(timestamp-timestamp[0], A_02@x_02, label="model_target_qd")
+        # axs[0].plot(timestamp-timestamp[0], A_02@x_02, label="model_target_qd")
+        axs[0].plot(timestamp-timestamp[0], ctrl_u[:,joi]+actual_q[:,joi], label="u")
+        axs[0].plot(timestamp[10:]-timestamp[0], sim_q[10:,joi], label="sim_q")
         axs[1].plot(timestamp-timestamp[0], actual_qd[:,joi], label="actual_qd")
         axs[1].plot(timestamp-timestamp[0], target_qd[:,joi], label="target_qd")
         axs[1].plot(timestamp-timestamp[0], A_01@x_01, label="model_target_qd")

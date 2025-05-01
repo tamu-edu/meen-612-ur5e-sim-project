@@ -42,12 +42,17 @@ class RobotSim():
         self.plant_context = self.plant_.CreateDefaultContext()
         self.q = np.array(q_0).reshape((-1,))
         self.qd = np.array(qd_0).reshape((-1,))
-        self.tau_delay = deque([0.0]*N_delay)
-        self.update(np.zeros((6,)),dt=0.0)
+
+        sampled_states = np.hstack((self.q, self.qd))
+        self.plant_.SetPositionsAndVelocities(self.plant_context, sampled_states)
+        self.Vq = self.plant_.CalcGravityGeneralizedForces(self.plant_context)  # calcs tau_g(q)
+        self.Mq = self.plant_.CalcMassMatrix(self.plant_context) # calcs M(q)
+        self.tau_delay = deque([-self.Vq]*N_delay)
+        # self.update(np.zeros((6,)),dt=0.0)
     
     def update(self, tau_control, tau_delta=0.0, dt=0.002):
         # update what we think the plant is at
-        self.tau_delay.appendleft(tau_control)
+
         self.plant_context = self.plant_.CreateDefaultContext()
 
         sampled_states = np.hstack((self.q, self.qd))
@@ -61,22 +66,50 @@ class RobotSim():
         self.Cv = self.plant_.CalcBiasTerm(self.plant_context) # calcs C(q, v) v
         self.Vq = self.plant_.CalcGravityGeneralizedForces(self.plant_context)  # calcs tau_g(q)
         self.Mq = self.plant_.CalcMassMatrix(self.plant_context) # calcs M(q)
+
+        self.tau_delay.appendleft(tau_control)
         
-        qdd = np.linalg.solve(self.Mq, self.tau_delay.pop() + tau_delta + self.Cv + self.Vq) # forward dynamics
+        qdd = np.linalg.solve(self.Mq, self.tau_delay.pop() + tau_delta - self.Cv + self.Vq) # forward dynamics
 
         self.q += self.qd*dt + 0.5 * qdd* dt**2
         self.qd += qdd * dt
 
         return self.q, self.qd, qdd
 
+# Literature values from
+# Andrea Raviola *, Roberto Guida, Andrea De Martin, Stefano Pastorelli, Stefano Mauro and Massimo Sorli
+# "Effects of Temperature and Mounting Configuration on the Dynamic Parameters Identification of Industrial Robots"
+# Robotics 2021, 10, 83. https://doi.org/10.3390/robotics10030083 (MDPI)
+# See Table 1 on page 4
+literature_G = 101.0
+literature_Ktau = np.array([0.1350, 0.1361, 0.1355, 0.0957, 0.0865, 0.0893])*literature_G # A/Nm
+current_dist = 0.0
     
 def test_sim():
-    rob = RobotSim(np.array([0.0]*6), np.array([0.0]*6), N_delay=2)
-    for i in range(10000):
-        rob.update(np.array([0.0]*6), tau_delta= - 10*rob.Mq@rob.qd, dt=0.002)
-        print(", ".join(["%.2f"%(q*180/np.pi) for q in rob.q]), f"{0.5*rob.qd.T@rob.Mq@rob.qd=}")
+    for z in range(6)[4:5]:
+        rob = RobotSim(np.array([0.0]*6), np.array([0.0]*6), N_delay=0)
+        dist = np.zeros((6,))
+        dist[z]=1
+        final_q = np.array([-70, -88, -98, -89, 263, -107])*np.pi/180.
+        con = FeedbackController(np.array([0.0]*6)+0.01*dist,final_q+0.01*dist)
+        tau = np.array([ 6.55645586e-04, -6.03647332e+01, -1.86301062e+01,  7.28433206e-05, -2.25094836e-05 ,-1.03442620e-16])
+        qs = []
+        traj_qs = []
+        for i in range(10000):
+            qs.append(np.array(rob.q))
+            tau = con.calc_control_effort(rob.q, rob.qd, i*0.002)
+            rob.update(tau, tau_delta= dist * literature_Ktau * (0. if i<8000 else 1.)* current_dist , dt=0.002)
+            traj_qs.append(con.q_des)
+            if i==100:
+                print(tau)
+            # print(", ".join(["%.2f"%(q*180/np.pi) for q in rob.q]), f"{0.5*rob.qd.T@rob.Mq@rob.qd=}")
+        plt.plot(qs)
+        plt.plot(traj_qs, ":")
+    plt.show()
 
     
 if __name__=="__main__":
+    import matplotlib.pyplot as plt
+    from my_controller import FeedbackController
     test_sim()
 
