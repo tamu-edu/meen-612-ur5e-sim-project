@@ -1,52 +1,58 @@
-// this is for emacs file handling -*- mode: c++; indent-tabs-mode: nil -*-
-
 // -- BEGIN LICENSE BLOCK ----------------------------------------------
-// Copyright 2020 FZI Forschungszentrum Informatik
+// Copyright 2025 Universal Robots A/S
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//    * Redistributions of source code must retain the above copyright
+//      notice, this list of conditions and the following disclaimer.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+//    * Redistributions in binary form must reproduce the above copyright
+//      notice, this list of conditions and the following disclaimer in the
+//      documentation and/or other materials provided with the distribution.
 //
+//    * Neither the name of the {copyright_holder} nor the names of its
+//      contributors may be used to endorse or promote products derived from
+//      this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 // -- END LICENSE BLOCK ------------------------------------------------
 
-//----------------------------------------------------------------------
-/*!\file
- *
- * \author  Felix Exner mauch@fzi.de
- * \date    2020-08-06
- *
- * Make sure to run this program from its source directory in order to find the respective files.
- *
- */
-//----------------------------------------------------------------------
+// Required before <cmath> for M_PI on Windows (MSVC)
+#define _USE_MATH_DEFINES
+#include <cmath>
 
 #include <ur_client_library/example_robot_wrapper.h>
-#include <ur_client_library/ur/dashboard_client.h>
-#include <ur_client_library/ur/ur_driver.h>
-#include <ur_client_library/types.h>
-
-#include <iostream>
-#include <memory>
-
-using namespace urcl;
+#include <ur_client_library/ur/instruction_executor.h>
+#include <cstddef>
 
 // In a real-world example it would be better to get those values from command line parameters / a
 // better configuration system such as Boost.Program_options
 const std::string DEFAULT_ROBOT_IP = "192.168.3.101";
-const std::string SCRIPT_FILE = "resources/external_control.urscript";
-const std::string OUTPUT_RECIPE = "resources/rtde_output_recipe.txt";
-const std::string INPUT_RECIPE = "resources/rtde_input_recipe.txt";
+const std::string SCRIPT_FILE = "resources2026/external_control.urscript";
+const std::string OUTPUT_RECIPE = "resources2026/rtde_output_recipe.txt";
+const std::string INPUT_RECIPE = "resources2026/rtde_input_recipe.txt";
 
-std::unique_ptr<ExampleRobotWrapper> g_my_robot;
-vector6d_t g_joint_positions;
+const size_t JOINT_INDEX = 5;  // Joint index to control, in this case joint 6 (index 5)
+
+// This example will apply a sinusoidal torque to JOINT_INDEX, while the other joints are kept at 0.0.
+constexpr double FREQUENCY = 0.2;  // [Hz]
+constexpr double AMPLITUDE = 2.5;  // [Nm]
+constexpr double OMEGA = 2 * M_PI * FREQUENCY;
+constexpr double START_POSITION = 0.0;  // [rad]
+
+std::unique_ptr<urcl::ExampleRobotWrapper> g_my_robot;
+urcl::vector6d_t g_joint_positions;
 
 int main(int argc, char* argv[])
 {
@@ -59,88 +65,125 @@ int main(int argc, char* argv[])
     robot_ip = std::string(argv[1]);
   }
 
+  // Parse how many seconds to run
+  auto second_to_run = std::chrono::seconds(0);
+  if (argc > 2)
+  {
+    second_to_run = std::chrono::seconds(std::stoi(argv[2]));
+  }
+
   bool headless_mode = true;
-  g_my_robot = std::make_unique<ExampleRobotWrapper>(robot_ip, OUTPUT_RECIPE, INPUT_RECIPE, headless_mode,
-                                                     "external_control.urp");
+  g_my_robot = std::make_unique<urcl::ExampleRobotWrapper>( robot_ip, OUTPUT_RECIPE, 
+                                                            INPUT_RECIPE, headless_mode, 
+                                                            "external_control.urp", SCRIPT_FILE);
+
   if (!g_my_robot->isHealthy())
   {
     URCL_LOG_ERROR("Something in the robot initialization went wrong. Exiting. Please check the output above.");
     return 1;
   }
+
+  // This example requires Software version 5.25.1 / 10.12.1 or higher. Skip gracefully on older
+  // software versions so that CI (which runs all examples) does not fail.
+  {
+    auto robot_version = g_my_robot->getUrDriver()->getVersion();
+    bool version_supported =
+        ((robot_version.major == 5) && (robot_version >= urcl::VersionInformation::fromString("5.25.1"))) ||
+        ((robot_version.major >= 10) && (robot_version >= urcl::VersionInformation::fromString("10.11.0")));
+    if (!version_supported)
+    {
+      URCL_LOG_INFO("This direct_torque control example requires a robot with at least version 5.25.1 / 10.11.0. Your "
+                    "robot has version %s. Skipping.",
+                    robot_version.toString().c_str());
+      return 0;
+    }
+  }
   // --------------- INITIALIZATION END -------------------
 
-  // Increment depends on robot version
-  double increment_constant = 0.0005;
-  if (g_my_robot->getUrDriver()->getVersion().major < 5)
-  {
-    increment_constant = 0.002;
-  }
-  double increment = increment_constant;
-
-  bool first_pass = true;
-  bool passed_negative_part = false;
-  bool passed_positive_part = false;
   URCL_LOG_INFO("Start moving the robot");
-  urcl::vector6d_t joint_target = { 0, 0, 0, 0, 0, 0 };
+  urcl::vector6d_t target_torques = { 0, 0, 0, 0, 0, 0 };
+
+  // Scale each individual joint's friction compensation. This is supported from PolyScope 5.25.1 / PolyScope X 10.12.1
+  // and upwards.
+  // urcl::vector6d_t viscous_scale = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+  // urcl::vector6d_t coulomb_scale = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+  // // As this example only applies to JOINT_INDEX, we can set the other joints to 0.0 to disable friction compensation to
+  // // make them more steady.
+  // viscous_scale[JOINT_INDEX] = 1.0;
+  // coulomb_scale[JOINT_INDEX] = 1.0;
+  // g_my_robot->getUrDriver()->setFrictionScales(viscous_scale, coulomb_scale);
+  g_my_robot->getUrDriver()->setFrictionCompensation(true); // for version <= 10.11
 
   // Once RTDE communication is started, we have to make sure to read from the interface buffer, as
   // otherwise we will get pipeline overflows. Therefor, do this directly before starting your main
   // loop.
   g_my_robot->getUrDriver()->startRTDECommunication();
-  while (!(passed_positive_part && passed_negative_part))
+
+  urcl::rtde_interface::DataPackage data_pkg(g_my_robot->getUrDriver()->getRTDEOutputRecipe());
+  if (!g_my_robot->getUrDriver()->getDataPackage(data_pkg))
   {
+    URCL_LOG_ERROR("Could not get fresh data package from robot");
+    return 1;
+  }
+  if (!data_pkg.getData("actual_q", g_joint_positions))
+  {
+    // This throwing should never happen unless misconfigured
+    std::string error_msg = "Did not find 'actual_q' in data sent from robot. This should not happen!";
+    throw std::runtime_error(error_msg);
+  }
+  // Use motion primitives to move JOINT_INDEX to start position
+  g_joint_positions[JOINT_INDEX] = START_POSITION;
+  auto instruction_executor = std::make_shared<urcl::InstructionExecutor>(g_my_robot->getUrDriver());
+  instruction_executor->optimoveJ(g_joint_positions);
+
+  auto start_time = std::chrono::system_clock::now();
+  constexpr double timestep = 0.002;  // [s]
+  double time = 0.0;
+
+  // Run 10 periods of the sinusoidal
+  while (time < 10 * 2 * M_PI / OMEGA)
+  {
+    time += timestep;
     // Read latest RTDE package. This will block for a hard-coded timeout (see UrDriver), so the
     // robot will effectively be in charge of setting the frequency of this loop.
     // In a real-world application this thread should be scheduled with real-time priority in order
     // to ensure that this is called in time.
-    std::unique_ptr<rtde_interface::DataPackage> data_pkg = g_my_robot->getUrDriver()->getDataPackage();
-    if (!data_pkg)
+    if (!g_my_robot->getUrDriver()->getDataPackage(data_pkg))
     {
       URCL_LOG_WARN("Could not get fresh data package from robot");
       return 1;
     }
     // Read current joint positions from robot data
-    if (!data_pkg->getData("actual_q", g_joint_positions))
+    if (!data_pkg.getData("actual_q", g_joint_positions))
     {
       // This throwing should never happen unless misconfigured
       std::string error_msg = "Did not find 'actual_q' in data sent from robot. This should not happen!";
       throw std::runtime_error(error_msg);
     }
 
-    if (first_pass)
-    {
-      joint_target = g_joint_positions;
-      first_pass = false;
-    }
-
     // Open loop control. The target is incremented with a constant each control loop
-    if (passed_positive_part == false)
-    {
-      increment = increment_constant;
-      if (g_joint_positions[5] >= 2)
-      {
-        passed_positive_part = true;
-      }
-    }
-    else if (passed_negative_part == false)
-    {
-      increment = -increment_constant;
-      if (g_joint_positions[5] <= 0)
-      {
-        passed_negative_part = true;
-      }
-    }
-    joint_target[5] += increment;
+    target_torques[JOINT_INDEX] = AMPLITUDE * std::sin(OMEGA * time);
+
     // Setting the RobotReceiveTimeout time is for example purposes only. This will make the example running more
-    // reliable on non-realtime systems. Use with caution in productive applications.
-    bool ret = g_my_robot->getUrDriver()->writeJointCommand(joint_target, comm::ControlMode::MODE_SERVOJ,
-                                                            RobotReceiveTimeout::millisec(100));
+    // reliable on non-realtime systems. Use with caution in productive applications. Having it
+    // this high means that the robot will continue a motion for this given time if no new command
+    // is sent / the connection is interrupted.
+    bool ret = g_my_robot->getUrDriver()->writeJointCommand(target_torques, urcl::comm::ControlMode::MODE_TORQUE,
+                                                            urcl::RobotReceiveTimeout::millisec(100));
     if (!ret)
     {
-      URCL_LOG_ERROR("Could not send joint command. Is the robot in remote control?");
+      URCL_LOG_ERROR("Could not send joint command. Make sure that the robot is in remote control mode and connected "
+                     "with a network cable.");
       return 1;
     }
-    URCL_LOG_DEBUG("data_pkg:\n%s", data_pkg->toString().c_str());
+    URCL_LOG_DEBUG("data_pkg:\n%s", data_pkg.toString().c_str());
+    if (second_to_run.count() > 0 && (std::chrono::system_clock::now() - start_time) > second_to_run)
+    {
+      URCL_LOG_WARN("Time limit reached, stopping movement. This is expected on a simualted robot, as it doesn't move "
+                    "to torque commands.");
+      break;
+    }
   }
   g_my_robot->getUrDriver()->stopControl();
   URCL_LOG_INFO("Movement done");
