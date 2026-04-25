@@ -31,7 +31,10 @@ def local_load_in_multibody_plant():
    
    
 class FeedbackController():
-    def __init__(self, q0, q1):
+    def __init__(self, 
+            q0=np.array([0.162774, -1.39593, -1.44978, -1.89947, 1.71143, 3.4145]), 
+            q1=np.array([0.062774, -1.19593, -1.24978, -1.89947, 0.71143, 2.4145])
+            ):
         # This is a model, which we keep around so we can ask it for the mass matrix and gravity
         self.plant_, self.model_idx_ = local_load_in_multibody_plant()
         #self.nstates = self.plant_.num_multibody_states(self.model_idx_)
@@ -107,7 +110,7 @@ class FeedbackController():
             [0,0,0,0,0,0.1],
             ])
 
-        freq = 0.8 # Hz
+        freq = 2.0 # Hz
         zeta = 1. # critical damping
         omega_n = 2*np.pi*freq
         Kprime = np.eye(6)*(omega_n)**2

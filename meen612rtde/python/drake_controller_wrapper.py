@@ -9,15 +9,17 @@ import copy
 import numpy as np
 from my_controller import FeedbackController
 
+MAX_CONTROL_EFFORT = 25 # Nm
+
 class FeedbackControllerDrakeSimWrapper(LeafSystem):
     '''
         DESCRIPTION
     '''
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         '''DO NO EDIT'''
         # drake specific setups
         LeafSystem.__init__(self)
-        self.controller = FeedbackController(np.array([-70, -88, -98, -89, 263, -107])*np.pi/180., np.array([-100, -70, -70, -89, 263, -107])*np.pi/180.)
+        self.controller = FeedbackController(*args, **kwargs)
         
         # declare avector input port the size of the robots state
         self.DeclareVectorInputPort("robot_state", 12)
@@ -34,6 +36,24 @@ class FeedbackControllerDrakeSimWrapper(LeafSystem):
         qd = np.array(sampled_states)[6:]
         
         tau_control = self.controller.calc_control_effort(q, qd, simulator_time)
+
+        tau_grav = self.GetInitialGravity(q, qd)
+
+
+        assert(np.all(np.isfinite(tau_control)))
+        tau_control = tau_grav + np.clip(tau_control-tau_grav, -MAX_CONTROL_EFFORT, MAX_CONTROL_EFFORT)
+
         
         # send the computed torues to the robot
         output.SetFromVector(tau_control)
+
+    def GetInitialGravity(self, q, qd):
+        # update what we think the plant is at
+        self.controller.plant_context = self.controller.plant_.CreateDefaultContext()
+        sampled_states = np.hstack((q, qd))
+        self.controller.plant_.SetPositionsAndVelocities(self.controller.plant_context, sampled_states)
+        
+        Vq = self.controller.plant_.CalcGravityGeneralizedForces(self.controller.plant_context)  # calcs tau_g(q)
+
+        tau_control = - Vq 
+        return tau_control

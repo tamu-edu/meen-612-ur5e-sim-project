@@ -45,9 +45,10 @@ class RobotSim():
 
         sampled_states = np.hstack((self.q, self.qd))
         self.plant_.SetPositionsAndVelocities(self.plant_context, sampled_states)
+        self.Cv = self.plant_.CalcBiasTerm(self.plant_context) # calcs C(q, v) v
         self.Vq = self.plant_.CalcGravityGeneralizedForces(self.plant_context)  # calcs tau_g(q)
         self.Mq = self.plant_.CalcMassMatrix(self.plant_context) # calcs M(q)
-        self.tau_delay = deque([-self.Vq]*N_delay)
+        self.tau_delay = deque([-self.Vq]*N_delay) # assume historical gravity comp
         # self.update(np.zeros((6,)),dt=0.0)
     
     def update(self, tau_control, tau_delta=0.0, dt=0.002):
@@ -74,7 +75,7 @@ class RobotSim():
         self.q += self.qd*dt + 0.5 * qdd* dt**2
         self.qd += qdd * dt
 
-        return self.q, self.qd, qdd
+        return np.array(self.q), np.array(self.qd), qdd
 
 # Literature values from
 # Andrea Raviola *, Roberto Guida, Andrea De Martin, Stefano Pastorelli, Stefano Mauro and Massimo Sorli

@@ -16,7 +16,7 @@
 
 #define COMMAND_SIZE 6
 #define DATA_SIZE 61
-#define MAX_CONTROL 5
+#define MAX_CONTROL 25
 #define APPLY_CONTROL true
 #define EXTRACT_DATA(name) if (!data_pkg.getData( #name , name ))\
     {\
