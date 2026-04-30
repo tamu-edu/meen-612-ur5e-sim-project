@@ -8,7 +8,7 @@ import copy
 import numpy as np
 
 def local_load_in_multibody_plant():   
-    ur_path = "./ur_description/urdf/ur5e.urdf"
+    ur_path = "./ur_description/urdf/ur5e_with_hand-e.urdf"
     ur_pkg = "./ur_description/package.xml"
     # set up a diagram and meshcat viewer
     local_builder = DiagramBuilder()
